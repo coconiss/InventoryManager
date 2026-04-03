@@ -1,5 +1,4 @@
 using InventoryManager.Helpers;
-using System.Windows.Controls;
 
 namespace InventoryManager.Views;
 

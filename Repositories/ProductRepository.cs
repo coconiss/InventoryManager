@@ -10,9 +10,6 @@ public class ProductRepository : IProductRepository
 
     public ProductRepository(DatabaseService db) => _db = db;
 
-    /// <summary>
-    /// 제품 목록 조회 - 현재수량은 stock_history 합산으로 계산
-    /// </summary>
     public async Task<List<Product>> GetAllAsync(string? keyword = null, bool includeInactive = false)
     {
         await using var conn = _db.GetConnection();
@@ -36,9 +33,7 @@ public class ProductRepository : IProductRepository
         var list = new List<Product>();
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
-        {
             list.Add(MapProduct(reader));
-        }
         return list;
     }
 
@@ -46,6 +41,7 @@ public class ProductRepository : IProductRepository
     {
         await using var conn = _db.GetConnection();
         await using var cmd = conn.CreateCommand();
+        // is_active 필터 없음 → 비활성 제품도 반환
         cmd.CommandText = """
             SELECT p.barcode, p.name, p.cost_price, p.sale_price, p.is_active, p.remark,
                    COALESCE(SUM(sh.quantity), 0) AS current_quantity
@@ -69,16 +65,12 @@ public class ProductRepository : IProductRepository
         return Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0;
     }
 
-    /// <summary>
-    /// 신규 등록: 제품 insert + 최초 입고 이력 생성 (트랜잭션)
-    /// </summary>
     public async Task AddAsync(Product product, int initialQuantity)
     {
         await using var conn = _db.GetConnection();
         await using var tx = conn.BeginTransaction();
         try
         {
-            // 1) 제품 등록
             await using var cmd1 = conn.CreateCommand();
             cmd1.Transaction = tx;
             cmd1.CommandText = """
@@ -92,7 +84,6 @@ public class ProductRepository : IProductRepository
             cmd1.Parameters.AddWithValue("@remark", product.Remark);
             await cmd1.ExecuteNonQueryAsync();
 
-            // 2) 최초 입고 이력
             await using var cmd2 = conn.CreateCommand();
             cmd2.Transaction = tx;
             cmd2.CommandText = """
@@ -105,11 +96,61 @@ public class ProductRepository : IProductRepository
 
             tx.Commit();
         }
-        catch
+        catch { tx.Rollback(); throw; }
+    }
+
+    /// <summary>
+    /// 비활성 제품을 재활성화하고 재고를 설정값으로 조정
+    /// </summary>
+    public async Task ReactivateAsync(Product product, int initialQuantity)
+    {
+        await using var conn = _db.GetConnection();
+        await using var tx = conn.BeginTransaction();
+        try
         {
-            tx.Rollback();
-            throw;
+            await using var cmd1 = conn.CreateCommand();
+            cmd1.Transaction = tx;
+            cmd1.CommandText = """
+                UPDATE products SET
+                    name = @name, cost_price = @cost, sale_price = @sale,
+                    remark = @remark, is_active = 1,
+                    updated_at = datetime('now','localtime')
+                WHERE barcode = @barcode
+                """;
+            cmd1.Parameters.AddWithValue("@barcode", product.Barcode);
+            cmd1.Parameters.AddWithValue("@name", product.Name);
+            cmd1.Parameters.AddWithValue("@cost", product.CostPrice);
+            cmd1.Parameters.AddWithValue("@sale", product.SalePrice);
+            cmd1.Parameters.AddWithValue("@remark", product.Remark);
+            await cmd1.ExecuteNonQueryAsync();
+
+            // 현재 누적 재고 조회 후 목표 수량으로 조정
+            await using var qCmd = conn.CreateCommand();
+            qCmd.Transaction = tx;
+            qCmd.CommandText = "SELECT COALESCE(SUM(quantity),0) FROM stock_history WHERE barcode = @b";
+            qCmd.Parameters.AddWithValue("@b", product.Barcode);
+            int currentQty = Convert.ToInt32(await qCmd.ExecuteScalarAsync());
+            int delta = initialQuantity - currentQty;
+
+            if (delta != 0)
+            {
+                await using var cmd2 = conn.CreateCommand();
+                cmd2.Transaction = tx;
+                cmd2.CommandText = """
+                    INSERT INTO stock_history (barcode, type, quantity, quantity_before, quantity_after, remark)
+                    VALUES (@barcode, @type, @qty, @before, @after, '재등록 조정')
+                    """;
+                cmd2.Parameters.AddWithValue("@barcode", product.Barcode);
+                cmd2.Parameters.AddWithValue("@type", delta > 0 ? "IN" : "ADJUST");
+                cmd2.Parameters.AddWithValue("@qty", delta);
+                cmd2.Parameters.AddWithValue("@before", currentQty);
+                cmd2.Parameters.AddWithValue("@after", initialQuantity);
+                await cmd2.ExecuteNonQueryAsync();
+            }
+
+            tx.Commit();
         }
+        catch { tx.Rollback(); throw; }
     }
 
     public async Task UpdateAsync(Product product)

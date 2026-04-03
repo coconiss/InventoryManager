@@ -1,7 +1,6 @@
 using InventoryManager.Helpers;
 using InventoryManager.Services;
 using InventoryManager.ViewModels;
-using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace InventoryManager.Views;
@@ -19,16 +18,13 @@ public partial class SaleView : System.Windows.Controls.UserControl
         DataContext = _vm;
     }
 
-    /// <summary>
-    /// USB HID 바코드 스캐너 입력 → BarcodeService로 전달
-    /// </summary>
-    private void Grid_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    private void Grid_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
     {
         _barcodeService.OnTextInput(e.Text);
-        e.Handled = true; // TextBox 기본 입력 차단
+        e.Handled = true;
     }
 
-    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
@@ -36,5 +32,20 @@ public partial class SaleView : System.Windows.Controls.UserControl
             e.Handled = true;
         }
         base.OnPreviewKeyDown(e);
+    }
+
+    private void LoadHistory_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        var dialog = new SaleHistoryDialog(ServiceLocator.GetSaleRepository())
+        {
+            Owner = System.Windows.Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true
+            && dialog.SelectedSaleId.HasValue
+            && dialog.SelectedDetails != null)
+        {
+            _vm.LoadFromHistory(dialog.SelectedSaleId.Value, dialog.SelectedDetails);
+        }
     }
 }

@@ -3,29 +3,25 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:helpers="clr-namespace:InventoryManager.Helpers">
 
-    <UserControl.Resources>
-    </UserControl.Resources>
-
     <Grid Margin="24">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>           <!-- 목록 -->
-            <ColumnDefinition Width="320"/>         <!-- 등록/수정 폼 -->
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="320"/>
         </Grid.ColumnDefinitions>
 
         <!-- ═══ 좌측: 제품 목록 ═══════════════════════════════════════ -->
         <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
             <DockPanel>
 
-                <!-- 헤더 -->
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,14">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="제품 목록"
-                               Style="{StaticResource SectionTitle}"
-                               Margin="0"/>
+                               Style="{StaticResource SectionTitle}" Margin="0"/>
                     <TextBox Grid.Column="1" Width="200"
                              Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,8,0">
@@ -35,16 +31,19 @@
                     </TextBox>
                     <Button Grid.Column="2" Content="🔍 검색"
                             Style="{StaticResource PrimaryButton}"
-                            Command="{Binding SearchCommand}"/>
+                            Command="{Binding SearchCommand}"
+                            Margin="0,0,8,0"/>
+                    <!-- 삭제 버튼: 헤더에 배치하여 크기 일관성 유지 -->
+                    <Button Grid.Column="3" Content="🗑️ 선택 삭제"
+                            Style="{StaticResource DangerButton}"
+                            Command="{Binding DeleteSelectedCommand}"/>
                 </Grid>
 
-                <!-- 상태 메시지 -->
                 <TextBlock DockPanel.Dock="Top"
                            Text="{Binding StatusMessage}"
                            Foreground="{StaticResource AccentBrush}"
                            FontSize="12" Margin="0,0,0,8"/>
 
-                <!-- DataGrid -->
                 <DataGrid x:Name="ProductGrid"
                           DockPanel.Dock="Top"
                           ItemsSource="{Binding Products}"
@@ -54,7 +53,10 @@
                           EnableRowVirtualization="True">
 
                     <DataGrid.Columns>
-                        <DataGridCheckBoxColumn Width="40"/>
+                        <!-- 체크박스: IsChecked 프로퍼티에 TwoWay 바인딩 -->
+                        <DataGridCheckBoxColumn Header=""
+                                                Binding="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="40"/>
                         <DataGridTextColumn Header="바코드" Binding="{Binding Barcode}" Width="140"/>
                         <DataGridTextColumn Header="제품명"  Binding="{Binding Name}"    Width="*"/>
                         <DataGridTextColumn Header="입고단가"
@@ -83,13 +85,6 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <!-- 하단 삭제 버튼 -->
-                <Button DockPanel.Dock="Bottom"
-                        Content="🗑️ 선택 삭제"
-                        Style="{StaticResource DangerButton}"
-                        Command="{Binding DeleteSelectedCommand}"
-                        HorizontalAlignment="Right" Margin="0,10,0,0"/>
-
             </DockPanel>
         </Border>
 
@@ -97,10 +92,7 @@
         <Border Grid.Column="1" Style="{StaticResource Card}">
             <DockPanel>
 
-                <!-- 폼 타이틀 -->
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
-                    <TextBlock Style="{StaticResource SectionTitle}" Margin="0"/>
-                    <!-- 타이틀 직접 표현 -->
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="✏️ 제품 수정" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
@@ -121,7 +113,6 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 입력 필드들 -->
                 <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 
@@ -167,7 +158,6 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 버튼 영역 -->
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                             HorizontalAlignment="Right">
                     <Button Content="취소"
@@ -179,7 +169,6 @@
                             Command="{Binding SaveCommand}"/>
                 </StackPanel>
 
-                <!-- 신규 버튼 -->
                 <Button DockPanel.Dock="Bottom"
                         Content="➕ 신규 제품"
                         Style="{StaticResource GhostButton}"

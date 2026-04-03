@@ -11,14 +11,13 @@ public class ProductViewModel : ViewModelBase
     private readonly IProductRepository _productRepo;
     private readonly LogService _log;
 
-    // ── 목록 ────────────────────────────────────────────────────
     public ObservableCollection<Product> Products { get; } = [];
 
     private string _searchKeyword = string.Empty;
     public string SearchKeyword
     {
         get => _searchKeyword;
-        set { SetProperty(ref _searchKeyword, value); }
+        set => SetProperty(ref _searchKeyword, value);
     }
 
     private Product? _selectedProduct;
@@ -32,7 +31,6 @@ public class ProductViewModel : ViewModelBase
         }
     }
 
-    // ── 등록/수정 폼 ─────────────────────────────────────────────
     private bool _isEditMode;
     public bool IsEditMode
     {
@@ -82,7 +80,6 @@ public class ProductViewModel : ViewModelBase
         set => SetProperty(ref _formRemark, value);
     }
 
-    // ── Commands ─────────────────────────────────────────────────
     public AsyncRelayCommand SearchCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
     public AsyncRelayCommand DeleteSelectedCommand { get; }
@@ -148,14 +145,29 @@ public class ProductViewModel : ViewModelBase
                     StatusMessage = "입고수량은 0 이상이어야 합니다.";
                     return;
                 }
-                if (await _productRepo.ExistsAsync(product.Barcode))
+
+                // 기존 제품 조회 (비활성 포함)
+                var existing = await _productRepo.GetByBarcodeAsync(product.Barcode);
+                if (existing != null)
                 {
-                    StatusMessage = "이미 존재하는 바코드입니다.";
-                    return;
+                    if (existing.IsActive)
+                    {
+                        StatusMessage = "이미 존재하는 바코드입니다.";
+                        return;
+                    }
+                    // 삭제된 제품 재등록
+                    await _productRepo.ReactivateAsync(product, FormQuantity);
+                    await _log.InfoAsync("Product",
+                        $"제품 재등록: {product.Barcode} [{product.Name}] 수량:{FormQuantity}");
+                    StatusMessage = "삭제된 제품을 재등록했습니다.";
                 }
-                await _productRepo.AddAsync(product, FormQuantity);
-                await _log.InfoAsync("Product", $"제품 등록: {product.Barcode} [{product.Name}] 수량:{FormQuantity}");
-                StatusMessage = "제품이 등록되었습니다.";
+                else
+                {
+                    await _productRepo.AddAsync(product, FormQuantity);
+                    await _log.InfoAsync("Product",
+                        $"제품 등록: {product.Barcode} [{product.Name}] 수량:{FormQuantity}");
+                    StatusMessage = "제품이 등록되었습니다.";
+                }
             }
 
             ClearForm();
@@ -171,24 +183,35 @@ public class ProductViewModel : ViewModelBase
 
     private async Task DeleteSelectedAsync()
     {
-        var targets = Products.Where(p => p.IsActive).ToList(); // 실제로는 체크박스 선택 목록
-        if (SelectedProduct == null) return;
+        var targets = Products.Where(p => p.IsChecked).ToList();
+        if (!targets.Any())
+        {
+            if (SelectedProduct != null)
+                targets.Add(SelectedProduct);
+            else
+            {
+                StatusMessage = "삭제할 제품을 체크하거나 선택해주세요.";
+                return;
+            }
+        }
 
-        bool hasSales = await _productRepo.HasSalesHistoryAsync(SelectedProduct.Barcode);
-        if (hasSales)
+        IsBusy = true;
+        try
         {
-            // 판매 이력 있으면 Soft Delete
-            await _productRepo.SoftDeleteAsync(SelectedProduct.Barcode);
-            await _log.WarnAsync("Product", $"제품 비활성화(판매이력): {SelectedProduct.Barcode}");
-            StatusMessage = "판매 이력이 있어 비활성화 처리되었습니다.";
+            foreach (var product in targets)
+            {
+                bool hasSales = await _productRepo.HasSalesHistoryAsync(product.Barcode);
+                await _productRepo.SoftDeleteAsync(product.Barcode);
+                if (hasSales)
+                    await _log.WarnAsync("Product", $"제품 비활성화(판매이력): {product.Barcode}");
+                else
+                    await _log.InfoAsync("Product", $"제품 삭제: {product.Barcode}");
+            }
+            StatusMessage = $"{targets.Count}개 제품이 삭제(비활성화)되었습니다.";
+            ClearForm();
+            await LoadProductsAsync();
         }
-        else
-        {
-            await _productRepo.SoftDeleteAsync(SelectedProduct.Barcode);
-            await _log.InfoAsync("Product", $"제품 삭제: {SelectedProduct.Barcode}");
-            StatusMessage = "삭제되었습니다.";
-        }
-        await LoadProductsAsync();
+        finally { IsBusy = false; }
     }
 
     private void LoadEditForm(Product p)

@@ -208,6 +208,16 @@
         <Setter Property="Margin" Value="0,0,0,4"/>
     </Style>
 
+    <!-- ── ComboBox ── -->
+    <Style TargetType="ComboBox">
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="8,0"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="White"/>
+    </Style>
+
     <!-- ── 상태바 ── -->
     <Style x:Key="StatusBar" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>

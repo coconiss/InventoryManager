@@ -5,10 +5,6 @@ using InventoryManager.ViewModels;
 
 namespace InventoryManager.Helpers
 {
-    /// <summary>
-    /// 간단한 Service Locator (DI 컨테이너 대신 사용)
-    /// 실제 프로젝트에서는 Microsoft.Extensions.DependencyInjection 권장
-    /// </summary>
     public static class ServiceLocator
     {
         private static DatabaseService? _db;
@@ -50,6 +46,12 @@ namespace InventoryManager.Helpers
             var stockRepo = new StockRepository(_db!);
             var saleRepo = new SaleRepository(_db!, stockRepo);
             return new RevenueViewModel(saleRepo);
+        }
+
+        public static ISaleRepository GetSaleRepository()
+        {
+            var stockRepo = new StockRepository(_db!);
+            return new SaleRepository(_db!, stockRepo);
         }
 
         public static BarcodeService GetBarcodeService() => _barcodeService!;

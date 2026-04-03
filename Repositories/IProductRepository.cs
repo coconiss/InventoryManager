@@ -9,6 +9,7 @@ public interface IProductRepository
     Task<bool> ExistsAsync(string barcode);
     Task AddAsync(Product product, int initialQuantity);
     Task UpdateAsync(Product product);
+    Task ReactivateAsync(Product product, int initialQuantity);
     Task SoftDeleteAsync(string barcode);
     Task<bool> HasSalesHistoryAsync(string barcode);
     Task<int> GetCurrentQuantityAsync(string barcode);

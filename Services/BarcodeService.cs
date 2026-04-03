@@ -1,34 +1,32 @@
 using System.IO.Ports;
+using System.Text;
 
 namespace InventoryManager.Services;
 
-/// <summary>
-/// 바코드 스캐너 서비스 - USB(HID), Serial(COM), Bluetooth 지원
-/// USB HID 방식: WPF KeyDown 이벤트로 처리 (별도 드라이버 불필요)
-/// Serial 방식: SerialPort 직접 연결
-/// </summary>
 public class BarcodeService : IDisposable
 {
     private SerialPort? _serialPort;
+
+    // HID 버퍼
     private string _buffer = string.Empty;
     private readonly System.Timers.Timer _hIdTimer;
+
+    // Serial 버퍼 (Byte 기반)
+    private readonly List<byte> _rxBuffer = new();
 
     public event EventHandler<string>? BarcodeScanned;
 
     public BarcodeService()
     {
-        // USB HID 입력은 글로벌 키 이벤트가 빠르게 들어오므로
-        // 50ms 내 버퍼에 쌓인 문자를 바코드로 처리
         _hIdTimer = new System.Timers.Timer(50);
         _hIdTimer.Elapsed += OnHidTimerElapsed;
         _hIdTimer.AutoReset = false;
     }
 
-    // ─── USB HID 방식 (WPF TextInput 이벤트에서 호출) ───────────────────
+    // ─────────────────────────────────────────────
+    // HID 방식
+    // ─────────────────────────────────────────────
 
-    /// <summary>
-    /// WPF Window에서 PreviewTextInput 이벤트로 각 문자 전달
-    /// </summary>
     public void OnTextInput(string text)
     {
         _hIdTimer.Stop();
@@ -48,27 +46,44 @@ public class BarcodeService : IDisposable
     private void FlushBuffer()
     {
         if (string.IsNullOrWhiteSpace(_buffer)) return;
+
         var barcode = _buffer.Trim();
         _buffer = string.Empty;
 
-        // UI 스레드에서 이벤트 발생
-        App.Current.Dispatcher.Invoke(() => BarcodeScanned?.Invoke(this, barcode));
+        try
+        {
+            App.Current.Dispatcher.InvokeAsync(() =>
+                BarcodeScanned?.Invoke(this, barcode));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Barcode] HID 오류: {ex.Message}");
+        }
     }
 
-    // ─── Serial (COM) 방식 ───────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // Serial 방식 (STX/ETX 프레임 기반)
+    // ─────────────────────────────────────────────
 
     public bool ConnectSerial(string portName, int baudRate = 9600)
     {
         try
         {
             DisconnectSerial();
+
             _serialPort = new SerialPort(portName, baudRate)
             {
-                NewLine = "\r\n",
-                ReadTimeout = 500
+                DataBits = 8,
+                Parity = Parity.None,
+                StopBits = StopBits.One,
+                Encoding = Encoding.ASCII
             };
+
             _serialPort.DataReceived += OnSerialDataReceived;
             _serialPort.Open();
+
+            _rxBuffer.Clear();
+
             return true;
         }
         catch (Exception ex)
@@ -80,24 +95,91 @@ public class BarcodeService : IDisposable
 
     public void DisconnectSerial()
     {
-        if (_serialPort?.IsOpen == true)
-            _serialPort.Close();
-        _serialPort?.Dispose();
-        _serialPort = null;
+        if (_serialPort != null)
+        {
+            _serialPort.DataReceived -= OnSerialDataReceived;
+
+            if (_serialPort.IsOpen)
+            {
+                try { _serialPort.Close(); } catch { }
+            }
+
+            _serialPort.Dispose();
+            _serialPort = null;
+        }
+
+        _rxBuffer.Clear();
     }
 
     private void OnSerialDataReceived(object sender, SerialDataReceivedEventArgs e)
     {
         try
         {
-            var barcode = _serialPort?.ReadLine()?.Trim();
-            if (!string.IsNullOrEmpty(barcode))
-                App.Current.Dispatcher.Invoke(() => BarcodeScanned?.Invoke(this, barcode));
+            if (_serialPort == null || !_serialPort.IsOpen) return;
+
+            int len = _serialPort.BytesToRead;
+            byte[] buffer = new byte[len];
+
+            _serialPort.Read(buffer, 0, len);
+
+            lock (_rxBuffer)
+            {
+                _rxBuffer.AddRange(buffer);
+
+                ParsePackets();
+            }
         }
-        catch { /* timeout 무시 */ }
+        catch (InvalidOperationException)
+        {
+            // 포트 닫히는 중
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Barcode] Serial 오류: {ex.Message}");
+        }
     }
 
-    public static string[] GetAvailablePorts() => SerialPort.GetPortNames();
+    private void ParsePackets()
+    {
+        while (true)
+        {
+            int stxIndex = _rxBuffer.IndexOf(0x02);
+            int etxIndex = _rxBuffer.IndexOf(0x03);
+
+            // 유효한 프레임이 없는 경우
+            if (stxIndex < 0 || etxIndex < 0 || etxIndex <= stxIndex)
+                return;
+
+            // STX ~ ETX 사이 데이터 추출
+            int length = etxIndex - stxIndex - 1;
+            if (length <= 0)
+            {
+                _rxBuffer.RemoveRange(0, etxIndex + 1);
+                continue;
+            }
+
+            byte[] packet = _rxBuffer
+                .Skip(stxIndex + 1)
+                .Take(length)
+                .ToArray();
+
+            // 처리된 데이터 제거
+            _rxBuffer.RemoveRange(0, etxIndex + 1);
+
+            string barcode = Encoding.ASCII.GetString(packet).Trim();
+
+            if (!string.IsNullOrEmpty(barcode))
+            {
+                string captured = barcode;
+
+                App.Current.Dispatcher.InvokeAsync(() =>
+                    BarcodeScanned?.Invoke(this, captured));
+            }
+        }
+    }
+
+    public static string[] GetAvailablePorts()
+        => SerialPort.GetPortNames();
 
     public void Dispose()
     {

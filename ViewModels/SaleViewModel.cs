@@ -6,7 +6,7 @@ using InventoryManager.ViewModels.Base;
 
 namespace InventoryManager.ViewModels;
 
-public class CartItem : InventoryManager.ViewModels.Base.ViewModelBase
+public class CartItem : ViewModelBase
 {
     private int _quantity;
     public string Barcode { get; set; } = string.Empty;
@@ -27,8 +27,10 @@ public class SaleViewModel : ViewModelBase
     private readonly BarcodeService _barcodeService;
     private readonly LogService _log;
 
-    public ObservableCollection<CartItem> CartItems { get; } = [];
+    /// <summary>불러온 기존 주문의 ID. null이면 신규 판매 모드.</summary>
+    private long? _editingSaleId;
 
+    public ObservableCollection<CartItem> CartItems { get; } = [];
     public int CartItemCount => CartItems.Count;
 
     private decimal _totalAmount;
@@ -52,7 +54,14 @@ public class SaleViewModel : ViewModelBase
         set => SetProperty(ref _lastScanResult, value);
     }
 
-    // Commands
+    /// <summary>수정 모드 여부 — 헤더 표시용</summary>
+    private bool _isEditMode;
+    public bool IsEditMode
+    {
+        get => _isEditMode;
+        set => SetProperty(ref _isEditMode, value);
+    }
+
     public AsyncRelayCommand CheckoutCommand { get; }
     public RelayCommand IncreaseQtyCommand { get; }
     public RelayCommand DecreaseQtyCommand { get; }
@@ -70,37 +79,30 @@ public class SaleViewModel : ViewModelBase
         _barcodeService = barcodeService;
         _log = log;
 
-        // 바코드 스캔 이벤트 구독
         _barcodeService.BarcodeScanned += OnBarcodeScanned;
 
         CheckoutCommand = new AsyncRelayCommand(CheckoutAsync, () => CartItems.Count > 0);
-        // Commands accept optional parameter (CartItem). If null, operate on SelectedCartItem.
         IncreaseQtyCommand = new RelayCommand(p => IncreaseQty(p as CartItem ?? SelectedCartItem));
         DecreaseQtyCommand = new RelayCommand(p => DecreaseQty(p as CartItem ?? SelectedCartItem));
         RemoveItemCommand = new RelayCommand(p => RemoveItem(p as CartItem ?? SelectedCartItem));
         ClearCartCommand = new RelayCommand(ClearCart);
 
-        // Update CartItemCount when collection changes
         CartItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(CartItemCount));
     }
 
     private async void OnBarcodeScanned(object? sender, string barcode)
     {
-        await AddToCartAsync(barcode);
+        try { await AddToCartAsync(barcode); }
+        catch (Exception ex) { LastScanResult = $"오류: {ex.Message}"; }
     }
 
-    /// <summary>
-    /// 바코드로 제품 조회 후 카트에 추가 또는 수량 증가
-    /// </summary>
     public async Task AddToCartAsync(string barcode)
     {
         try
         {
-            // 이미 카트에 있으면 수량 증가
             var existing = CartItems.FirstOrDefault(c => c.Barcode == barcode);
             if (existing != null)
             {
-                // 재고 확인
                 int stock = await _productRepo.GetCurrentQuantityAsync(barcode);
                 if (existing.Quantity >= stock)
                 {
@@ -113,7 +115,6 @@ public class SaleViewModel : ViewModelBase
                 return;
             }
 
-            // 신규 추가
             var product = await _productRepo.GetByBarcodeAsync(barcode);
             if (product == null)
             {
@@ -142,6 +143,29 @@ public class SaleViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 과거 판매 내역을 수정 모드로 불러옴.
+    /// </summary>
+    public void LoadFromHistory(long saleId, List<SaleDetail> details)
+    {
+        ClearCart();
+        _editingSaleId = saleId;
+        IsEditMode = true;
+
+        foreach (var d in details)
+        {
+            CartItems.Add(new CartItem
+            {
+                Barcode = d.Barcode,
+                Name = d.ProductName,
+                Price = d.Price,
+                Quantity = d.Quantity
+            });
+        }
+        RefreshCart();
+        LastScanResult = $"✏️ 주문 #{saleId} 수정 모드 — 변경 후 [결제 완료]를 누르면 주문이 수정됩니다.";
+    }
+
     private async Task CheckoutAsync()
     {
         IsBusy = true;
@@ -155,10 +179,24 @@ public class SaleViewModel : ViewModelBase
                 Price = c.Price
             }).ToList();
 
-            long saleId = await _saleRepo.ProcessSaleAsync(details);
-            await _log.InfoAsync("Sale", $"판매 완료 #{saleId} 금액:{TotalAmount:N0}원");
+            if (_editingSaleId.HasValue)
+            {
+                // ── 수정 모드: 기존 주문 업데이트 ──
+                long targetId = _editingSaleId.Value;
+                await _saleRepo.UpdateSaleAsync(targetId, details);
+                await _log.InfoAsync("Sale",
+                    $"판매 수정 #{targetId} 금액:{TotalAmount:N0}원");
+                StatusMessage = $"✅ 주문 #{targetId} 수정 완료 | 합계: {TotalAmount:N0}원";
+            }
+            else
+            {
+                // ── 신규 판매 ──
+                long saleId = await _saleRepo.ProcessSaleAsync(details);
+                await _log.InfoAsync("Sale",
+                    $"판매 완료 #{saleId} 금액:{TotalAmount:N0}원");
+                StatusMessage = $"✅ 결제 완료 #{saleId} | 합계: {TotalAmount:N0}원";
+            }
 
-            StatusMessage = $"✅ 결제 완료 #{saleId} | 합계: {TotalAmount:N0}원";
             ClearCart();
         }
         catch (InvalidOperationException ex)
@@ -173,40 +211,29 @@ public class SaleViewModel : ViewModelBase
         finally { IsBusy = false; }
     }
 
-    private void IncreaseQty(CartItem? item)
-    {
-        if (item == null) return;
-        item.Quantity++;
-        RefreshCart();
-    }
+    private void IncreaseQty(CartItem? item) { if (item == null) return; item.Quantity++; RefreshCart(); }
 
     private void DecreaseQty(CartItem? item)
     {
         if (item == null) return;
-        if (item.Quantity <= 1)
-            CartItems.Remove(item);
-        else
-            item.Quantity--;
+        if (item.Quantity <= 1) CartItems.Remove(item);
+        else item.Quantity--;
         RefreshCart();
     }
 
-    private void RemoveItem(CartItem? item)
-    {
-        if (item != null)
-            CartItems.Remove(item);
-        RefreshCart();
-    }
+    private void RemoveItem(CartItem? item) { if (item != null) CartItems.Remove(item); RefreshCart(); }
 
     private void ClearCart()
     {
         CartItems.Clear();
+        _editingSaleId = null;
+        IsEditMode = false;
         RefreshCart();
     }
 
     private void RefreshCart()
     {
         TotalAmount = CartItems.Sum(c => c.LineTotal);
-        // ObservableCollection은 아이템 속성 변경을 감지 못하므로 강제 갱신
         var temp = CartItems.ToList();
         CartItems.Clear();
         foreach (var item in temp) CartItems.Add(item);

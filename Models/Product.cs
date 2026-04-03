@@ -12,4 +12,5 @@ public class Product
     public int CurrentQuantity { get; set; }               // 계산된 현재수량 (View 전용)
     public bool IsActive { get; set; } = true;             // Soft Delete
     public string Remark { get; set; } = string.Empty;
+    public bool IsChecked { get; set; } = false;
 }

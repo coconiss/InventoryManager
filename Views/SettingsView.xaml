@@ -13,15 +13,14 @@
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="180"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="연결 방식"
                                    Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1" Margin="0,0,8,0"
-                                  SelectedItem="{Binding ScannerMode}"
-                                  VerticalContentAlignment="Center"
-                                  MinWidth="150">
+                        <!-- Width 명시로 과도한 늘어남 방지 -->
+                        <ComboBox Grid.Column="1" Width="180" Margin="0,0,8,0"
+                                  SelectedItem="{Binding ScannerMode}">
                             <ComboBoxItem>USB (HID) - 자동</ComboBoxItem>
                             <ComboBoxItem>Serial (COM)</ComboBoxItem>
                             <ComboBoxItem>Bluetooth</ComboBoxItem>
@@ -40,25 +39,20 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="COM 포트"
                                    Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1" Margin="0,0,12,0"
+                        <ComboBox Grid.Column="1" Width="150" Margin="0,0,12,0"
                                   ItemsSource="{Binding AvailablePorts}"
-                                  SelectedItem="{Binding SelectedPort}"
-                                  VerticalContentAlignment="Center"/>
+                                  SelectedItem="{Binding SelectedPort}"/>
                         <TextBlock Grid.Column="2" Text="통신속도(Baud)"
                                    Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
                         <TextBox Grid.Column="3"
-                                 Text="{Binding BaudRate, UpdateSourceTrigger=PropertyChanged}"
-                                 VerticalContentAlignment="Center"/>
+                                 Text="{Binding BaudRate, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
 
-                    <!-- ViewModel.StatusMessage 표시 -->
                     <TextBlock Margin="0,8,0,0"
                                Text="{Binding StatusMessage}"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                FontSize="12"
-                               VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"/>
-
                 </StackPanel>
             </Border>
 
@@ -75,8 +69,7 @@
                         <TextBlock Grid.Column="0" Text="경고 기준 수량 (전체 공통)"
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Column="1" Margin="12,0"
-                                 Text="{Binding LowStockWarning, UpdateSourceTrigger=PropertyChanged}"
-                                 VerticalContentAlignment="Center"/>
+                                 Text="{Binding LowStockWarning, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBlock Grid.Column="2" VerticalAlignment="Center"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Text="개 이하이면 노란색으로 표시"/>
@@ -88,21 +81,18 @@
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="💾 데이터 백업" Style="{StaticResource SectionTitle}"/>
-
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0" Margin="0,0,8,0"
-                                 Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}"
-                                 IsReadOnly="True"
-                                 VerticalContentAlignment="Center"/>
+                                 Text="{Binding BackupPath}"
+                                 IsReadOnly="True"/>
                         <Button Grid.Column="1" Content="폴더 선택"
                                 Style="{StaticResource GhostButton}"
                                 Command="{Binding SelectBackupFolderCommand}"/>
                     </Grid>
-
                     <StackPanel Orientation="Horizontal">
                         <CheckBox Content="자동 백업 (24시간 주기)"
                                   IsChecked="{Binding AutoBackup}"
@@ -127,7 +117,6 @@
                 </StackPanel>
             </Border>
 
-            <!-- 저장 버튼 -->
             <Button Content="💾 설정 저장"
                     Style="{StaticResource PrimaryButton}"
                     Command="{Binding SaveSettingsCommand}"
