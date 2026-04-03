@@ -121,6 +121,17 @@ public class SaleViewModel : ViewModelBase
                 LastScanResult = $"❌ 등록되지 않은 바코드: {barcode}";
                 return;
             }
+            // 삭제(비활성)된 제품은 계산에서 제외하고 메시지 표시
+            if (!product.IsActive)
+            {
+                // UI 스레드에서 메시지 박스 표시
+                App.Current.Dispatcher.Invoke(() =>
+                {
+                    System.Windows.MessageBox.Show($"삭제된 제품입니다! : {product.Name}", "경고", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                });
+                LastScanResult = $"⚠️ 삭제된 제품입니다!: {product.Name}";
+                return;
+            }
             if (product.CurrentQuantity <= 0)
             {
                 LastScanResult = $"⚠️ 재고 없음: {product.Name}";

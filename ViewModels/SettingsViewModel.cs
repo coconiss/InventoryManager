@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using InventoryManager.Helpers;
+using InventoryManager.Models;
 using InventoryManager.Services;
 using InventoryManager.ViewModels.Base;
 
@@ -9,6 +10,7 @@ public class SettingsViewModel : ViewModelBase
 {
     private readonly BarcodeService _barcodeService;
     private readonly BackupService _backupService;
+    private readonly ConfigService _configService;
 
     // ── 바코드 설정 ──
     private string _scannerMode = "USB (HID) - 자동";
@@ -63,8 +65,18 @@ public class SettingsViewModel : ViewModelBase
     {
         _barcodeService = barcodeService;
         _backupService = backupService;
+        _configService = ServiceLocator.GetConfigService();
 
-        // COM 포트 목록 로드
+        // 설정 로드
+        var cfg = _configService.Load();
+        ScannerMode = cfg.ScannerMode ?? ScannerMode;
+        SelectedPort = string.IsNullOrWhiteSpace(cfg.BarcodePort) ? SelectedPort : cfg.BarcodePort;
+        BaudRate = cfg.BarcodeBaudRate;
+        LowStockWarning = cfg.LowStockWarning;
+        AutoBackup = cfg.AutoBackup;
+        BackupPath = cfg.BackupPath ?? BackupPath;
+
+        // COM 포트 목록 로드 (넉넉한 Width로 잘림 방지 위해)
         foreach (var p in BarcodeService.GetAvailablePorts())
             AvailablePorts.Add(p);
 
@@ -126,6 +138,34 @@ public class SettingsViewModel : ViewModelBase
             _backupService.StartAutoBackup(24, BackupPath);
         else
             _backupService.StopAutoBackup();
+
+        // 설정 저장 (파일)
+        var cfg = new AppConfig
+        {
+            LowStockWarning = LowStockWarning,
+            BarcodePort = SelectedPort,
+            BarcodeBaudRate = BaudRate,
+            AutoBackup = AutoBackup,
+            BackupPath = BackupPath,
+            ScannerMode = ScannerMode
+        };
+        _configService.Save(cfg);
+
+        // 바코드 서비스 연결/해제 반영
+        try
+        {
+            if (ScannerMode?.Contains("Serial", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                _barcodeService.ConnectSerial(SelectedPort, BaudRate);
+            }
+            else
+            {
+                // HID 등 Serial이 아니면 기존 시리얼 연결 해제
+                _barcodeService.DisconnectSerial();
+            }
+        }
+        catch { }
+
         StatusMessage = "✅ 설정이 저장되었습니다.";
     }
 }

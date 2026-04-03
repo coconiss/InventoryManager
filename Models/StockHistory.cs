@@ -58,6 +58,7 @@ public class AppConfig
     public int LowStockWarning { get; set; } = 5;          // 재고 경고 수량
     public string BarcodePort { get; set; } = "AUTO";       // COM 포트 or AUTO
     public int BarcodeBaudRate { get; set; } = 9600;
+    public string ScannerMode { get; set; } = "USB (HID) - 자동";
     public bool AutoBackup { get; set; } = true;
     public string BackupPath { get; set; } = string.Empty;
 }

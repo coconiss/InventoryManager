@@ -177,7 +177,21 @@ public class RevenueViewModel : ViewModelBase
         LoadDailyCommand = new AsyncRelayCommand(LoadDailyAsync);
         LoadMonthlyCommand = new AsyncRelayCommand(LoadMonthlyAsync);
         LoadProductSalesCommand = new AsyncRelayCommand(LoadProductSalesAsync);
+
+        // 통합 조회 버튼용
+        LoadCommand = new AsyncRelayCommand(async () =>
+        {
+            // 탭 인덱스에 따라 적절한 로드 실행
+            if (SelectedTabIndex == 0) await LoadDailyAsync();
+            else if (SelectedTabIndex == 1) await LoadMonthlyAsync();
+            else await LoadProductSalesAsync();
+        });
     }
+
+    private int _selectedTabIndex;
+    public int SelectedTabIndex { get => _selectedTabIndex; set => SetProperty(ref _selectedTabIndex, value); }
+
+    public AsyncRelayCommand LoadCommand { get; }
 
     private async Task LoadDailyAsync()
     {
@@ -199,7 +213,7 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Values = values,
                     Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
-                    Name = "일별 매출"
+                    Name = ""
                 }
             ];
             DailyXAxes =
@@ -236,7 +250,7 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Values = values,
                     Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
-                    Name = "월별 매출"
+                    Name = ""
                 }
             ];
             MonthlyXAxes =
@@ -270,7 +284,7 @@ public class RevenueViewModel : ViewModelBase
             {
                 Values = top.Select(p => (double)p.Total).ToArray(),
                 Fill = new SolidColorPaint(new SKColor(231, 76, 60)),
-                Name = "제품별 매출"
+                Name = ""
             }
         ];
 

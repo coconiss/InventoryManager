@@ -13,14 +13,13 @@
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="연결 방식"
                                    Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
-                        <!-- Width 명시로 과도한 늘어남 방지 -->
-                        <ComboBox Grid.Column="1" Width="180" Margin="0,0,8,0"
-                                  SelectedItem="{Binding ScannerMode}">
+                        <ComboBox Grid.Column="1" Margin="0,0,8,0"
+                                  SelectedItem="{Binding ScannerMode}" HorizontalContentAlignment="Left">
                             <ComboBoxItem>USB (HID) - 자동</ComboBoxItem>
                             <ComboBoxItem>Serial (COM)</ComboBoxItem>
                             <ComboBoxItem>Bluetooth</ComboBoxItem>
@@ -33,13 +32,13 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="220"/>
                             <ColumnDefinition Width="150"/>
                             <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="COM 포트"
                                    Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1" Width="150" Margin="0,0,12,0"
+                        <ComboBox Grid.Column="1" Margin="0,0,12,0"
                                   ItemsSource="{Binding AvailablePorts}"
                                   SelectedItem="{Binding SelectedPort}"/>
                         <TextBlock Grid.Column="2" Text="통신속도(Baud)"
