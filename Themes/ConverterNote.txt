@@ -1,0 +1,6 @@
+    <!-- Converters (Styles.xaml 하단에 추가) -->
+    <!--
+    <helpers:InverseBoolConverter x:Key="InverseBoolConverter"/>
+    이 줄을 App.xaml Resources에 추가하세요:
+    xmlns:helpers="clr-namespace:InventoryManager.Helpers"
+    -->

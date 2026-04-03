@@ -1,0 +1,193 @@
+<UserControl x:Class="InventoryManager.Views.ProductView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:InventoryManager.Helpers">
+
+    <UserControl.Resources>
+    </UserControl.Resources>
+
+    <Grid Margin="24">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>           <!-- 목록 -->
+            <ColumnDefinition Width="320"/>         <!-- 등록/수정 폼 -->
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 좌측: 제품 목록 ═══════════════════════════════════════ -->
+        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
+            <DockPanel>
+
+                <!-- 헤더 -->
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="제품 목록"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0"/>
+                    <TextBox Grid.Column="1" Width="200"
+                             Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,8,0">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Grid.Column="2" Content="🔍 검색"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SearchCommand}"/>
+                </Grid>
+
+                <!-- 상태 메시지 -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding StatusMessage}"
+                           Foreground="{StaticResource AccentBrush}"
+                           FontSize="12" Margin="0,0,0,8"/>
+
+                <!-- DataGrid -->
+                <DataGrid x:Name="ProductGrid"
+                          DockPanel.Dock="Top"
+                          ItemsSource="{Binding Products}"
+                          SelectedItem="{Binding SelectedProduct}"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          EnableRowVirtualization="True">
+
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Width="40"/>
+                        <DataGridTextColumn Header="바코드" Binding="{Binding Barcode}" Width="140"/>
+                        <DataGridTextColumn Header="제품명"  Binding="{Binding Name}"    Width="*"/>
+                        <DataGridTextColumn Header="입고단가"
+                                            Binding="{Binding CostPrice, StringFormat={}{0:N0}}"
+                                            Width="90"/>
+                        <DataGridTextColumn Header="판매단가"
+                                            Binding="{Binding SalePrice, StringFormat={}{0:N0}}"
+                                            Width="90"/>
+                        <DataGridTemplateColumn Header="현재수량" Width="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding CurrentQuantity,
+                                                Converter={StaticResource StockColorConverter}}"
+                                            CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="{Binding CurrentQuantity}"
+                                                   HorizontalAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="상태"
+                                            Binding="{Binding CurrentQuantity,
+                                                Converter={StaticResource StockStatusConverter}}"
+                                            Width="80"/>
+                        <DataGridTextColumn Header="비고" Binding="{Binding Remark}" Width="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 하단 삭제 버튼 -->
+                <Button DockPanel.Dock="Bottom"
+                        Content="🗑️ 선택 삭제"
+                        Style="{StaticResource DangerButton}"
+                        Command="{Binding DeleteSelectedCommand}"
+                        HorizontalAlignment="Right" Margin="0,10,0,0"/>
+
+            </DockPanel>
+        </Border>
+
+        <!-- ═══ 우측: 등록/수정 폼 ════════════════════════════════════ -->
+        <Border Grid.Column="1" Style="{StaticResource Card}">
+            <DockPanel>
+
+                <!-- 폼 타이틀 -->
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+                    <TextBlock Style="{StaticResource SectionTitle}" Margin="0"/>
+                    <!-- 타이틀 직접 표현 -->
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="✏️ 제품 수정" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Visibility="{Binding IsEditMode,
+                                       Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <TextBlock Text="➕ 신규 등록" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+
+                <!-- 입력 필드들 -->
+                <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="바코드 *" Style="{StaticResource FormLabel}"/>
+                        <TextBox Text="{Binding FormBarcode, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding IsEditMode, Converter={StaticResource InverseBoolConverter}}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="제품명 *" Style="{StaticResource FormLabel}"/>
+                        <TextBox Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="입고단가 *" Style="{StaticResource FormLabel}"/>
+                        <TextBox Text="{Binding FormCostPrice, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="판매단가" Style="{StaticResource FormLabel}"/>
+                        <TextBox Text="{Binding FormSalePrice, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource FormLabel}">
+                                    <Setter Property="Text" Value="입고수량 *"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                            <Setter Property="Text" Value="현재수량 (수정 불가)"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBox Text="{Binding FormQuantity, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding IsEditMode, Converter={StaticResource InverseBoolConverter}}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="비고" Style="{StaticResource FormLabel}"/>
+                        <TextBox Text="{Binding FormRemark, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                                 Margin="0,0,0,20"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 버튼 영역 -->
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button Content="취소"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding CancelCommand}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="💾 저장"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SaveCommand}"/>
+                </StackPanel>
+
+                <!-- 신규 버튼 -->
+                <Button DockPanel.Dock="Bottom"
+                        Content="➕ 신규 제품"
+                        Style="{StaticResource GhostButton}"
+                        Command="{Binding NewFormCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,10"/>
+
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

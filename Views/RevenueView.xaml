@@ -1,0 +1,93 @@
+<UserControl x:Class="InventoryManager.Views.RevenueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ 조회 조건 카드 ════════════════════════════════════════ -->
+        <Border Grid.Row="0" Style="{StaticResource Card}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="기간:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <DatePicker SelectedDate="{Binding FromDate}" Width="130" Margin="0,0,8,0"/>
+                <TextBlock Text="~" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <DatePicker SelectedDate="{Binding ToDate}" Width="130" Margin="0,0,16,0"/>
+                <Button Content="📊 일별 조회"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding LoadDailyCommand}"
+                        Margin="0,0,8,0"/>
+                <Button Content="📅 월별 조회"
+                        Style="{StaticResource GhostButton}"
+                        Command="{Binding LoadMonthlyCommand}"/>
+                <Border Background="{StaticResource ContentBgBrush}"
+                        CornerRadius="6" Padding="16,6" Margin="20,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="총 매출: " Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock FontWeight="Bold" Foreground="{StaticResource AccentBrush}">
+                            <TextBlock.Text>
+                                <Binding Path="TotalRevenue" StringFormat="{}{0:N0} 원"/>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ 하단: 탭 (일별 / 월별) ══════════════════════════════ -->
+        <TabControl Grid.Row="2">
+
+            <!-- 일별 매출 -->
+            <TabItem Header="📅 일별 매출">
+                <Border Style="{StaticResource Card}" Margin="0,8,0,0">
+                    <DataGrid ItemsSource="{Binding DailySales}"
+                              VirtualizingPanel.IsVirtualizing="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="날짜"
+                                                Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd'}"
+                                                Width="160"/>
+                            <DataGridTextColumn Header="매출액"
+                                                Binding="{Binding TotalAmount, StringFormat={}{0:N0}}"
+                                                Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </TabItem>
+
+            <!-- 월별 매출 -->
+            <TabItem Header="📆 월별 매출">
+                <Border Style="{StaticResource Card}" Margin="0,8,0,0">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBlock Text="연도:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Text="{Binding SelectedYear, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="80" Margin="0,0,8,0"/>
+                            <Button Content="조회"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding LoadMonthlyCommand}"/>
+                        </StackPanel>
+                        <DataGrid DockPanel.Dock="Top"
+                                  ItemsSource="{Binding MonthlySales}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="연월" Width="160">
+                                    <DataGridTextColumn.Binding>
+                                        <Binding Path="YM"/>
+                                    </DataGridTextColumn.Binding>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="매출액" Width="*">
+                                    <DataGridTextColumn.Binding>
+                                        <Binding Path="Total" StringFormat="{}{0:N0}"/>
+                                    </DataGridTextColumn.Binding>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Border>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</UserControl>
