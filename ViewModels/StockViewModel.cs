@@ -120,7 +120,6 @@ public class RevenueViewModel : ViewModelBase
 
     private static SKTypeface LoadKoreanTypeface()
     {
-        // 맑은 고딕 (Windows 기본 한글 폰트)
         var candidates = new[]
         {
             @"C:\Windows\Fonts\malgun.ttf",
@@ -132,21 +131,30 @@ public class RevenueViewModel : ViewModelBase
             if (File.Exists(path))
                 return SKTypeface.FromFile(path);
         }
-        // 폰트 파일 없을 때 시스템에서 한글 폰트 검색
         return SKTypeface.FromFamilyName("Malgun Gothic")
             ?? SKTypeface.FromFamilyName("나눔고딕")
             ?? SKTypeface.Default;
     }
 
-    private SolidColorPaint KoreanPaint(SKColor color, float size = 11f) =>
+    /// <summary>
+    /// 한글 폰트가 적용된 SolidColorPaint 생성.
+    /// TextSize를 명시적으로 설정해야 툴팁 등에서도 폰트가 적용됨.
+    /// </summary>
+    private static SolidColorPaint MakeKoreanPaint(SKColor color, float size = 11f) =>
         new SolidColorPaint(color)
         {
             SKTypeface = KoreanTypeface,
-            SKFontStyle = new SKFontStyle(SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+            SKFontStyle = new SKFontStyle(
+                SKFontStyleWeight.Normal,
+                SKFontStyleWidth.Normal,
+                SKFontStyleSlant.Upright)
         };
 
-    private SolidColorPaint KoreanLabelPaint(float size = 11f) =>
-        KoreanPaint(new SKColor(99, 110, 114), size);
+    private static SolidColorPaint LabelPaint(float size = 11f) =>
+        MakeKoreanPaint(new SKColor(99, 110, 114), size);
+
+    private static SolidColorPaint TooltipPaint(float size = 12f) =>
+        MakeKoreanPaint(new SKColor(45, 52, 54), size);
 
     public ObservableCollection<SaleMaster> DailySales { get; } = [];
     public ObservableCollection<(string YM, decimal Total)> MonthlySales { get; } = [];
@@ -249,12 +257,29 @@ public class RevenueViewModel : ViewModelBase
         });
     }
 
+    /// <summary>
+    /// Y축 레이블: 1만 미만은 원 단위 그대로, 이상은 소수점 1자리 만원 단위 표시.
+    /// ex) 5000 → "5,000"  /  33200 → "3.3만"  /  100000 → "10.0만"
+    /// </summary>
+    private static string FormatYLabel(double v)
+    {
+        if (v >= 10000)
+        {
+            double man = v / 10000.0;
+            // 소수점이 없으면 정수로, 있으면 1자리까지
+            return man == Math.Floor(man)
+                ? $"{man:N0}만"
+                : $"{man:N1}만";
+        }
+        return $"{v:N0}";
+    }
+
     private Axis[] MakeYAxis() =>
     [
         new Axis
         {
-            Labeler = v => v >= 10000 ? $"{v / 10000:N0}만" : $"{v:N0}",
-            LabelsPaint = KoreanLabelPaint(),
+            Labeler = FormatYLabel,
+            LabelsPaint = LabelPaint(),
             TextSize = 11
         }
     ];
@@ -279,11 +304,14 @@ public class RevenueViewModel : ViewModelBase
                     Values = values,
                     Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
                     Name = "일별 매출",
+                    // 툴팁에 한글 폰트 적용
                     TooltipLabelFormatter = p =>
-                        $"{(labels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
-                            ? labels[(int)p.Context.Entity.MetaData.EntityIndex]
-                            : "")} : {p.PrimaryValue:N0}원",
-                    DataLabelsPaint = KoreanLabelPaint()
+                    {
+                        int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
+                        string label = idx < labels.Length ? labels[idx] : "";
+                        return $"{label} : {p.PrimaryValue:N0}원";
+                    },
+                    DataLabelsPaint = LabelPaint()
                 }
             ];
             DailyXAxes =
@@ -292,7 +320,7 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Labels = labels,
                     LabelsRotation = -45,
-                    LabelsPaint = KoreanLabelPaint(),
+                    LabelsPaint = LabelPaint(),
                     TextSize = 11
                 }
             ];
@@ -308,7 +336,6 @@ public class RevenueViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            // 상단 FromDate에서 연도 자동 추출
             int year = FromDate.Year;
             var items = await _saleRepo.GetMonthlySalesAsync(year);
             MonthlySales.Clear();
@@ -325,10 +352,12 @@ public class RevenueViewModel : ViewModelBase
                     Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
                     Name = "월별 매출",
                     TooltipLabelFormatter = p =>
-                        $"{(labels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
-                            ? labels[(int)p.Context.Entity.MetaData.EntityIndex]
-                            : "")} : {p.PrimaryValue:N0}원",
-                    DataLabelsPaint = KoreanLabelPaint()
+                    {
+                        int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
+                        string label = idx < labels.Length ? labels[idx] : "";
+                        return $"{label} : {p.PrimaryValue:N0}원";
+                    },
+                    DataLabelsPaint = LabelPaint()
                 }
             ];
             MonthlyXAxes =
@@ -336,7 +365,7 @@ public class RevenueViewModel : ViewModelBase
                 new Axis
                 {
                     Labels = labels,
-                    LabelsPaint = KoreanLabelPaint(),
+                    LabelsPaint = LabelPaint(),
                     TextSize = 11
                 }
             ];
@@ -371,10 +400,12 @@ public class RevenueViewModel : ViewModelBase
                 Fill = new SolidColorPaint(new SKColor(231, 76, 60)),
                 Name = "제품별 매출",
                 TooltipLabelFormatter = p =>
-                    $"{(productLabels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
-                        ? productLabels[(int)p.Context.Entity.MetaData.EntityIndex]
-                        : "")} : {p.PrimaryValue:N0}원",
-                DataLabelsPaint = KoreanLabelPaint()
+                {
+                    int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
+                    string label = idx < productLabels.Length ? productLabels[idx] : "";
+                    return $"{label} : {p.PrimaryValue:N0}원";
+                },
+                DataLabelsPaint = LabelPaint()
             }
         ];
 
@@ -384,8 +415,7 @@ public class RevenueViewModel : ViewModelBase
             {
                 Labels = productLabels,
                 LabelsRotation = -30,
-                // 한글 폰트 적용 — 글자 깨짐 방지
-                LabelsPaint = KoreanLabelPaint(),
+                LabelsPaint = LabelPaint(),
                 TextSize = 10
             }
         ];
