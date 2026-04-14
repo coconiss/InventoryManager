@@ -4,6 +4,7 @@ using InventoryManager.Repositories;
 using InventoryManager.Services;
 using InventoryManager.ViewModels.Base;
 using LiveChartsCore;
+using LiveChartsCore.Measure;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
@@ -114,6 +115,39 @@ public class RevenueViewModel : ViewModelBase
 {
     private readonly ISaleRepository _saleRepo;
 
+    // SkiaSharp 한글 폰트 — Windows 맑은 고딕 우선, 없으면 기본 폰트
+    private static readonly SKTypeface KoreanTypeface = LoadKoreanTypeface();
+
+    private static SKTypeface LoadKoreanTypeface()
+    {
+        // 맑은 고딕 (Windows 기본 한글 폰트)
+        var candidates = new[]
+        {
+            @"C:\Windows\Fonts\malgun.ttf",
+            @"C:\Windows\Fonts\malgunbd.ttf",
+            @"C:\Windows\Fonts\NanumGothic.ttf",
+        };
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path))
+                return SKTypeface.FromFile(path);
+        }
+        // 폰트 파일 없을 때 시스템에서 한글 폰트 검색
+        return SKTypeface.FromFamilyName("Malgun Gothic")
+            ?? SKTypeface.FromFamilyName("나눔고딕")
+            ?? SKTypeface.Default;
+    }
+
+    private SolidColorPaint KoreanPaint(SKColor color, float size = 11f) =>
+        new SolidColorPaint(color)
+        {
+            SKTypeface = KoreanTypeface,
+            SKFontStyle = new SKFontStyle(SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+        };
+
+    private SolidColorPaint KoreanLabelPaint(float size = 11f) =>
+        KoreanPaint(new SKColor(99, 110, 114), size);
+
     public ObservableCollection<SaleMaster> DailySales { get; } = [];
     public ObservableCollection<(string YM, decimal Total)> MonthlySales { get; } = [];
     public ObservableCollection<ProductSaleRow> ProductSales { get; } = [];
@@ -133,6 +167,13 @@ public class RevenueViewModel : ViewModelBase
         private set => SetProperty(ref _dailyXAxes, value);
     }
 
+    private Axis[] _dailyYAxes = [];
+    public Axis[] DailyYAxes
+    {
+        get => _dailyYAxes;
+        private set => SetProperty(ref _dailyYAxes, value);
+    }
+
     private ISeries[] _monthlySeries = [];
     public ISeries[] MonthlySeries
     {
@@ -147,11 +188,32 @@ public class RevenueViewModel : ViewModelBase
         private set => SetProperty(ref _monthlyXAxes, value);
     }
 
+    private Axis[] _monthlyYAxes = [];
+    public Axis[] MonthlyYAxes
+    {
+        get => _monthlyYAxes;
+        private set => SetProperty(ref _monthlyYAxes, value);
+    }
+
     private ISeries[] _productSeries = [];
     public ISeries[] ProductSeries
     {
         get => _productSeries;
         private set => SetProperty(ref _productSeries, value);
+    }
+
+    private Axis[] _productXAxes = [];
+    public Axis[] ProductXAxes
+    {
+        get => _productXAxes;
+        private set => SetProperty(ref _productXAxes, value);
+    }
+
+    private Axis[] _productYAxes = [];
+    public Axis[] ProductYAxes
+    {
+        get => _productYAxes;
+        private set => SetProperty(ref _productYAxes, value);
     }
 
     // ── 날짜 조건 ────────────────────────────────────────────────
@@ -161,15 +223,16 @@ public class RevenueViewModel : ViewModelBase
     private DateTime _toDate = DateTime.Today;
     public DateTime ToDate { get => _toDate; set => SetProperty(ref _toDate, value); }
 
-    private int _selectedYear = DateTime.Today.Year;
-    public int SelectedYear { get => _selectedYear; set => SetProperty(ref _selectedYear, value); }
-
     private decimal _totalRevenue;
     public decimal TotalRevenue { get => _totalRevenue; set => SetProperty(ref _totalRevenue, value); }
+
+    private int _selectedTabIndex;
+    public int SelectedTabIndex { get => _selectedTabIndex; set => SetProperty(ref _selectedTabIndex, value); }
 
     public AsyncRelayCommand LoadDailyCommand { get; }
     public AsyncRelayCommand LoadMonthlyCommand { get; }
     public AsyncRelayCommand LoadProductSalesCommand { get; }
+    public AsyncRelayCommand LoadCommand { get; }
 
     public RevenueViewModel(ISaleRepository saleRepo)
     {
@@ -178,20 +241,23 @@ public class RevenueViewModel : ViewModelBase
         LoadMonthlyCommand = new AsyncRelayCommand(LoadMonthlyAsync);
         LoadProductSalesCommand = new AsyncRelayCommand(LoadProductSalesAsync);
 
-        // 통합 조회 버튼용
         LoadCommand = new AsyncRelayCommand(async () =>
         {
-            // 탭 인덱스에 따라 적절한 로드 실행
             if (SelectedTabIndex == 0) await LoadDailyAsync();
             else if (SelectedTabIndex == 1) await LoadMonthlyAsync();
             else await LoadProductSalesAsync();
         });
     }
 
-    private int _selectedTabIndex;
-    public int SelectedTabIndex { get => _selectedTabIndex; set => SetProperty(ref _selectedTabIndex, value); }
-
-    public AsyncRelayCommand LoadCommand { get; }
+    private Axis[] MakeYAxis() =>
+    [
+        new Axis
+        {
+            Labeler = v => v >= 10000 ? $"{v / 10000:N0}만" : $"{v:N0}",
+            LabelsPaint = KoreanLabelPaint(),
+            TextSize = 11
+        }
+    ];
 
     private async Task LoadDailyAsync()
     {
@@ -203,7 +269,6 @@ public class RevenueViewModel : ViewModelBase
             foreach (var s in items) DailySales.Add(s);
             TotalRevenue = DailySales.Sum(s => s.TotalAmount);
 
-            // 차트 업데이트
             var values = DailySales.Select(s => (double)s.TotalAmount).ToArray();
             var labels = DailySales.Select(s => s.CreatedAt.ToString("MM/dd")).ToArray();
 
@@ -213,7 +278,12 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Values = values,
                     Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
-                    Name = ""
+                    Name = "일별 매출",
+                    TooltipLabelFormatter = p =>
+                        $"{(labels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
+                            ? labels[(int)p.Context.Entity.MetaData.EntityIndex]
+                            : "")} : {p.PrimaryValue:N0}원",
+                    DataLabelsPaint = KoreanLabelPaint()
                 }
             ];
             DailyXAxes =
@@ -222,11 +292,12 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Labels = labels,
                     LabelsRotation = -45,
+                    LabelsPaint = KoreanLabelPaint(),
                     TextSize = 11
                 }
             ];
+            DailyYAxes = MakeYAxis();
 
-            // 제품별도 같은 기간으로 갱신
             await LoadProductSalesAsync();
         }
         finally { IsBusy = false; }
@@ -237,7 +308,9 @@ public class RevenueViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var items = await _saleRepo.GetMonthlySalesAsync(SelectedYear);
+            // 상단 FromDate에서 연도 자동 추출
+            int year = FromDate.Year;
+            var items = await _saleRepo.GetMonthlySalesAsync(year);
             MonthlySales.Clear();
             foreach (var s in items) MonthlySales.Add(s);
 
@@ -250,13 +323,24 @@ public class RevenueViewModel : ViewModelBase
                 {
                     Values = values,
                     Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
-                    Name = ""
+                    Name = "월별 매출",
+                    TooltipLabelFormatter = p =>
+                        $"{(labels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
+                            ? labels[(int)p.Context.Entity.MetaData.EntityIndex]
+                            : "")} : {p.PrimaryValue:N0}원",
+                    DataLabelsPaint = KoreanLabelPaint()
                 }
             ];
             MonthlyXAxes =
             [
-                new Axis { Labels = labels, TextSize = 11 }
+                new Axis
+                {
+                    Labels = labels,
+                    LabelsPaint = KoreanLabelPaint(),
+                    TextSize = 11
+                }
             ];
+            MonthlyYAxes = MakeYAxis();
         }
         finally { IsBusy = false; }
     }
@@ -276,36 +360,37 @@ public class RevenueViewModel : ViewModelBase
             });
         }
 
-        // 상위 10개만 차트로 표시
         var top = ProductSales.Take(10).ToList();
+        var productLabels = top.Select(p => p.Name.Length > 8 ? p.Name[..8] + "…" : p.Name).ToArray();
+
         ProductSeries =
         [
             new ColumnSeries<double>
             {
                 Values = top.Select(p => (double)p.Total).ToArray(),
                 Fill = new SolidColorPaint(new SKColor(231, 76, 60)),
-                Name = ""
+                Name = "제품별 매출",
+                TooltipLabelFormatter = p =>
+                    $"{(productLabels.Length > (int)p.Context.Entity.MetaData!.EntityIndex
+                        ? productLabels[(int)p.Context.Entity.MetaData.EntityIndex]
+                        : "")} : {p.PrimaryValue:N0}원",
+                DataLabelsPaint = KoreanLabelPaint()
             }
         ];
 
-        // ProductSeries용 X축은 별도 프로퍼티로 관리 (뷰에서 static 레이블 사용)
-        OnPropertyChanged(nameof(ProductSeries));
-        var productXAxes = new Axis[]
-        {
+        ProductXAxes =
+        [
             new Axis
             {
-                Labels = top.Select(p => p.Name.Length > 8 ? p.Name[..8] + "…" : p.Name).ToArray(),
+                Labels = productLabels,
                 LabelsRotation = -30,
+                // 한글 폰트 적용 — 글자 깨짐 방지
+                LabelsPaint = KoreanLabelPaint(),
                 TextSize = 10
             }
-        };
-        ProductXAxes = productXAxes;
-    }
+        ];
+        ProductYAxes = MakeYAxis();
 
-    private Axis[] _productXAxes = [];
-    public Axis[] ProductXAxes
-    {
-        get => _productXAxes;
-        private set => SetProperty(ref _productXAxes, value);
+        OnPropertyChanged(nameof(ProductSeries));
     }
 }

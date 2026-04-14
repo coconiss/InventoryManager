@@ -62,3 +62,15 @@ public class AppConfig
     public bool AutoBackup { get; set; } = true;
     public string BackupPath { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// 보류 카트 요약 (목록 표시용)
+/// </summary>
+public class HeldCart
+{
+    public long Id { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public decimal TotalAmount { get; set; }
+    public int ItemCount { get; set; }
+}

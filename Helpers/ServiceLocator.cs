@@ -12,6 +12,7 @@ namespace InventoryManager.Helpers
         private static LogService? _log;
         private static BackupService? _backup;
         private static ConfigService? _configService;
+        private static IHoldRepository? _holdRepo;
 
         public static void Initialize()
         {
@@ -22,6 +23,8 @@ namespace InventoryManager.Helpers
             _barcodeService = new BarcodeService();
             _log = new LogService();
             _backup = new BackupService(_db);
+
+            _holdRepo = new HoldRepository(_db);
 
             // 자동 연결: 설정이 Serial(COM)일 때 포트 자동 연결 시도
             try
@@ -55,7 +58,7 @@ namespace InventoryManager.Helpers
             var productRepo = new ProductRepository(_db!);
             var stockRepo = new StockRepository(_db!);
             var saleRepo = new SaleRepository(_db!, stockRepo);
-            return new SaleViewModel(productRepo, saleRepo, _barcodeService!, _log!);
+            return new SaleViewModel(productRepo, saleRepo, GetHoldRepository(), _barcodeService!, _log!);
         }
 
         public static RevenueViewModel GetRevenueViewModel()
@@ -75,5 +78,6 @@ namespace InventoryManager.Helpers
         public static BackupService GetBackupService() => _backup!;
         public static LogService GetLogService() => _log!;
         public static ConfigService GetConfigService() => _configService!;
+        public static IHoldRepository GetHoldRepository() => _holdRepo ??= new HoldRepository(_db!);
     }
 }

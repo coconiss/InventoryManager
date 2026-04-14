@@ -47,18 +47,14 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 일별 차트 -->
                     <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,8,0,0">
-                        <Grid>
-                            <lvc:CartesianChart Series="{Binding DailySeries}"
-                                                XAxes="{Binding DailyXAxes}"
-                                                AnimationsSpeed="00:00:00.4"/>
-                            <!-- 툴팁/호버로 인한 글자 깨짐을 우회하기 위해 마우스 인터랙션을 차단하는 투명 오버레이 -->
-                            <Rectangle Fill="Transparent" IsHitTestVisible="True" />
-                        </Grid>
+                        <lvc:CartesianChart Series="{Binding DailySeries}"
+                                            XAxes="{Binding DailyXAxes}"
+                                            YAxes="{Binding DailyYAxes}"
+                                            TooltipPosition="Top"
+                                            AnimationsSpeed="00:00:00.4"/>
                     </Border>
 
-                    <!-- 일별 테이블 -->
                     <Border Grid.Row="2" Style="{StaticResource Card}">
                         <DataGrid ItemsSource="{Binding DailySales}"
                                   VirtualizingPanel.IsVirtualizing="True">
@@ -84,41 +80,30 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 월별 차트 -->
                     <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,8,0,0">
-                        <Grid>
-                            <lvc:CartesianChart Series="{Binding MonthlySeries}"
-                                                XAxes="{Binding MonthlyXAxes}"
-                                                AnimationsSpeed="00:00:00.4"/>
-                            <Rectangle Fill="Transparent" IsHitTestVisible="True" />
-                        </Grid>
+                        <lvc:CartesianChart Series="{Binding MonthlySeries}"
+                                            XAxes="{Binding MonthlyXAxes}"
+                                            YAxes="{Binding MonthlyYAxes}"
+                                            TooltipPosition="Top"
+                                            AnimationsSpeed="00:00:00.4"/>
                     </Border>
 
-                    <!-- 월별 테이블 -->
+                    <!-- 월별 테이블 (연도/조회 컨트롤 제거 — 상단 기간에서 자동 추출) -->
                     <Border Grid.Row="2" Style="{StaticResource Card}">
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
-                                <TextBlock Text="연도:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox Text="{Binding SelectedYear, UpdateSourceTrigger=PropertyChanged}"
-                                         Width="80" Margin="0,0,8,0"/>
-                                <Button Content="조회" Style="{StaticResource PrimaryButton}"
-                                        Command="{Binding LoadCommand}"/>
-                            </StackPanel>
-                            <DataGrid DockPanel.Dock="Top" ItemsSource="{Binding MonthlySales}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="연월" Width="160">
-                                        <DataGridTextColumn.Binding>
-                                            <Binding Path="YM"/>
-                                        </DataGridTextColumn.Binding>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="매출액" Width="*">
-                                        <DataGridTextColumn.Binding>
-                                            <Binding Path="Total" StringFormat="{}{0:N0}"/>
-                                        </DataGridTextColumn.Binding>
-                                    </DataGridTextColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </DockPanel>
+                        <DataGrid ItemsSource="{Binding MonthlySales}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="연월" Width="160">
+                                    <DataGridTextColumn.Binding>
+                                        <Binding Path="YM"/>
+                                    </DataGridTextColumn.Binding>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="매출액" Width="*">
+                                    <DataGridTextColumn.Binding>
+                                        <Binding Path="Total" StringFormat="{}{0:N0}"/>
+                                    </DataGridTextColumn.Binding>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </Border>
                 </Grid>
             </TabItem>
@@ -132,17 +117,14 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 제품별 차트 (상위 10개) -->
                     <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,8,0,0">
-                        <Grid>
-                            <lvc:CartesianChart Series="{Binding ProductSeries}"
-                                                XAxes="{Binding ProductXAxes}"
-                                                AnimationsSpeed="00:00:00.4"/>
-                            <Rectangle Fill="Transparent" IsHitTestVisible="True" />
-                        </Grid>
+                        <lvc:CartesianChart Series="{Binding ProductSeries}"
+                                            XAxes="{Binding ProductXAxes}"
+                                            YAxes="{Binding ProductYAxes}"
+                                            TooltipPosition="Top"
+                                            AnimationsSpeed="00:00:00.4"/>
                     </Border>
 
-                    <!-- 제품별 테이블 -->
                     <Border Grid.Row="2" Style="{StaticResource Card}">
                         <DataGrid ItemsSource="{Binding ProductSales}"
                                   VirtualizingPanel.IsVirtualizing="True">

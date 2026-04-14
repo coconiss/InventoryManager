@@ -33,7 +33,7 @@
                                 Style="{StaticResource DangerButton}"
                                 Command="{Binding ClearCartCommand}"/>
                     </Grid>
-                    <!-- 수정 모드 배너 -->
+                    <!-- 수정 모드 / 스캔 결과 배너 -->
                     <Border Grid.Row="1" Margin="0,8,0,0" CornerRadius="6" Padding="10,6">
                         <Border.Style>
                             <Style TargetType="Border">
@@ -105,9 +105,10 @@
                 <TextBlock DockPanel.Dock="Top" Text="결제"
                            Style="{StaticResource SectionTitle}"/>
 
+                <!-- 합계 금액 -->
                 <Border DockPanel.Dock="Top"
                         Background="{StaticResource ContentBgBrush}"
-                        CornerRadius="8" Padding="16" Margin="0,0,0,20">
+                        CornerRadius="8" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
                         <TextBlock Text="합계 금액" FontSize="12"
                                    Foreground="{StaticResource TextSecondaryBrush}"
@@ -122,13 +123,44 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 종류 수 -->
                 <TextBlock DockPanel.Dock="Top" HorizontalAlignment="Center" Margin="0,0,0,12">
                     <Run Text="총 "/>
                     <Run Text="{Binding CartItemCount, Mode=OneWay}" FontWeight="Bold"/>
                     <Run Text=" 종류"/>
                 </TextBlock>
 
-                <!-- 신규/수정 모드에 따라 버튼 레이블 변경 -->
+                <!-- ── 수동 바코드 입력 ── -->
+                <Border DockPanel.Dock="Top"
+                        Background="#F8F9FA" CornerRadius="6"
+                        Padding="12" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="바코드 직접 입력" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,0,0,6"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ManualBarcodeBox"
+                                     Grid.Column="0"
+                                     Text="{Binding ManualBarcode, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,6,0">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding ManualAddCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <Button Grid.Column="1"
+                                    Content="추가"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding ManualAddCommand}"
+                                    Padding="10,6"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 결제 버튼 -->
                 <Button DockPanel.Dock="Bottom"
                         Style="{StaticResource SuccessButton}"
                         FontSize="18" Height="60"
@@ -149,17 +181,35 @@
                     </Button.Content>
                 </Button>
 
+                <!-- 보류 버튼 -->
+                <Button DockPanel.Dock="Bottom"
+                        Content="📌 카트 보류"
+                        Style="{StaticResource GhostButton}"
+                        Command="{Binding HoldCartCommand}"
+                        FontSize="14" Height="42"
+                        Margin="0,0,0,8"
+                        Click="HoldCart_Click"/>
+
+                <!-- 보류 불러오기 버튼 -->
+                <Button DockPanel.Dock="Bottom"
+                        Content="📂 보류 불러오기"
+                        Style="{StaticResource GhostButton}"
+                        FontSize="13" Height="36"
+                        Margin="0,0,0,6"
+                        Click="LoadHold_Click"/>
+
                 <TextBlock DockPanel.Dock="Bottom"
                            Text="{Binding StatusMessage}"
                            FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource AccentBrush}"
                            Margin="0,8" HorizontalAlignment="Center"/>
 
+                <!-- 스캐너 안내 (작게) -->
                 <Border DockPanel.Dock="Top"
                         Background="#FFF9C4" CornerRadius="6"
-                        Padding="12" Margin="0,20,0,0">
+                        Padding="10,6" Margin="0,8,0,0">
                     <TextBlock Text="📡 바코드 스캐너를 이 화면에서 스캔하세요."
-                               FontSize="12" TextWrapping="Wrap"
+                               FontSize="11" TextWrapping="Wrap"
                                Foreground="#7D6608"/>
                 </Border>
             </DockPanel>

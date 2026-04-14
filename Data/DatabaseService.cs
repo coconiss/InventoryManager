@@ -12,7 +12,6 @@ public class DatabaseService
 
     public DatabaseService()
     {
-        // 실행 파일 옆에 inventory.db 생성 (오프라인 환경 대응)
         var dbPath = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "Data",
@@ -29,7 +28,6 @@ public class DatabaseService
         var conn = new SqliteConnection(_connectionString);
         conn.Open();
 
-        // WAL 모드: 동시 읽기/쓰기 성능 향상
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;";
         cmd.ExecuteNonQuery();
@@ -88,6 +86,23 @@ public class DatabaseService
             price        REAL NOT NULL
         );
 
+        -- 보류 카트 Master
+        CREATE TABLE IF NOT EXISTS held_carts (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            label      TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        );
+
+        -- 보류 카트 Detail
+        CREATE TABLE IF NOT EXISTS held_cart_items (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            cart_id      INTEGER NOT NULL REFERENCES held_carts(id),
+            barcode      TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            quantity     INTEGER NOT NULL,
+            price        REAL NOT NULL
+        );
+
         -- 앱 설정
         CREATE TABLE IF NOT EXISTS app_config (
             key   TEXT PRIMARY KEY,
@@ -107,6 +122,7 @@ public class DatabaseService
         CREATE INDEX IF NOT EXISTS idx_stock_created ON stock_history(created_at);
         CREATE INDEX IF NOT EXISTS idx_sale_detail_sale ON sale_details(sale_id);
         CREATE INDEX IF NOT EXISTS idx_sale_master_created ON sale_masters(created_at);
+        CREATE INDEX IF NOT EXISTS idx_held_cart_items_cart ON held_cart_items(cart_id);
         """;
 
     public string GetDbPath() =>

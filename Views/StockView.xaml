@@ -23,9 +23,9 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="120"/>
                         <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="3"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="📦 재고 현황"
