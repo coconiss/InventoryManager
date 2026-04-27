@@ -105,10 +105,21 @@ public class SaleViewModel : ViewModelBase
         CartItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(CartItemCount));
     }
 
+    /// <summary>
+    /// 바코드 스캐너로부터 바코드 정보가 입력되었을 때 호출됩니다.
+    /// 백그라운드 이벤트에서 올라오더라도 예외가 UI 스레드를 다운시키지 않도록 try-catch로 감쌉니다.
+    /// </summary>
+    /// <param name="barcode">스캔된 바코드 문자열</param>
     private async void OnBarcodeScanned(object? sender, string barcode)
     {
-        try { await AddToCartAsync(barcode); }
-        catch (Exception ex) { LastScanResult = $"오류: {ex.Message}"; }
+        try
+        {
+            await AddToCartAsync(barcode);
+        }
+        catch (Exception ex)
+        {
+            LastScanResult = $"스캔 오류: {ex.Message}";
+        }
     }
 
     /// <summary>수동 입력 엔터/버튼 처리</summary>
@@ -120,10 +131,16 @@ public class SaleViewModel : ViewModelBase
         await AddToCartAsync(barcode);
     }
 
+    /// <summary>
+    /// 바코드 문자열을 받아 제품을 조회하고, 카트에 항목을 추가하거나 수량을 증가시킵니다.
+    /// 슈퍼마켓 특성상 가장 빈번하게 호출되므로 무거운 로직은 피해야 합니다.
+    /// </summary>
+    /// <param name="barcode">추가할 제품의 바코드</param>
     public async Task AddToCartAsync(string barcode)
     {
         try
         {
+            // 1. 이미 카트에 담긴 상품인지 확인 (재고 검증 후 수량만 +1)
             var existing = CartItems.FirstOrDefault(c => c.Barcode == barcode);
             if (existing != null)
             {
@@ -135,33 +152,39 @@ public class SaleViewModel : ViewModelBase
                 }
                 existing.Quantity++;
                 RefreshCart();
-                LastScanResult = $"✅ {existing.Name} 수량 증가 → {existing.Quantity}";
+                LastScanResult = $"✅ {existing.Name} 수량 추가됨 (총 {existing.Quantity}개)";
                 return;
             }
 
+            // 2. 카트에 없는 상품일 경우 신규 제품 조회
             var product = await _productRepo.GetByBarcodeAsync(barcode);
             if (product == null)
             {
-                LastScanResult = $"❌ 등록되지 않은 바코드: {barcode}";
+                LastScanResult = $"❌ 미등록 바코드: {barcode}";
                 return;
             }
+
+            // 삭제(비활성화)된 제품 판매 방지
             if (!product.IsActive)
             {
                 App.Current.Dispatcher.Invoke(() =>
                 {
                     System.Windows.MessageBox.Show(
-                        $"삭제된 제품입니다! : {product.Name}", "경고",
+                        $"삭제된 제품은 판매할 수 없습니다.\n제품명: {product.Name}", "경고",
                         System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
                 });
-                LastScanResult = $"⚠️ 삭제된 제품입니다!: {product.Name}";
+                LastScanResult = $"⚠️ 삭제된 제품: {product.Name}";
                 return;
             }
+
+            // 재고가 0인 경우 경고 (음수 판매를 막음)
             if (product.CurrentQuantity <= 0)
             {
                 LastScanResult = $"⚠️ 재고 없음: {product.Name}";
                 return;
             }
 
+            // 3. 검증이 완료된 상품을 카트에 신규 등록
             CartItems.Add(new CartItem
             {
                 Barcode = product.Barcode,
@@ -169,6 +192,7 @@ public class SaleViewModel : ViewModelBase
                 Price = product.SalePrice,
                 Quantity = 1
             });
+
             RefreshCart();
             LastScanResult = $"✅ [{product.Name}] 추가됨";
         }

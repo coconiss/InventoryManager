@@ -1,33 +1,44 @@
 using Microsoft.Data.Sqlite;
+using System.IO;
+using System;
 
 namespace InventoryManager.Data;
 
 /// <summary>
-/// SQLite 연결 및 스키마 초기화 담당
-/// 앱 전역에서 싱글턴으로 사용
+/// SQLite 데이터베이스 연결 및 초기 스키마 생성을 담당하는 서비스입니다.
+/// 애플리케이션 전역에서 싱글턴으로 관리되어야 합니다.
 /// </summary>
 public class DatabaseService
 {
     private readonly string _connectionString;
+    private readonly string _dbPath;
 
+    /// <summary>
+    /// DatabaseService 생성자. AppData 폴더에 DB 경로를 설정하고 스키마를 초기화합니다.
+    /// </summary>
     public DatabaseService()
     {
-        var dbPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "Data",
-            "inventory.db");
+        // 튜닝: Program Files 권한 문제를 피하기 위해 AppData/Local 폴더 사용
+        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        _dbPath = Path.Combine(appDataPath, "InventoryManager", "Data", "inventory.db");
 
-        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-        _connectionString = $"Data Source={dbPath};";
+        Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
+        _connectionString = $"Data Source={_dbPath};";
 
         InitializeSchema();
     }
 
+    /// <summary>
+    /// SQLite 데이터베이스 연결 객체를 반환합니다.
+    /// 트랜잭션 및 쿼리 실행 시 이 메서드를 통해 Connection을 얻어 사용합니다.
+    /// </summary>
+    /// <returns>열려 있는 SqliteConnection 객체</returns>
     public SqliteConnection GetConnection()
     {
         var conn = new SqliteConnection(_connectionString);
         conn.Open();
 
+        // 튜닝: WAL 모드를 켜서 동시 읽기/쓰기 성능 향상 및 외래키 제약조건 활성화
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;";
         cmd.ExecuteNonQuery();
@@ -35,6 +46,10 @@ public class DatabaseService
         return conn;
     }
 
+    /// <summary>
+    /// 데이터베이스 스키마(테이블, 인덱스, 기본 데이터)를 초기화합니다.
+    /// 앱 실행 시 테이블이 없으면 생성합니다.
+    /// </summary>
     private void InitializeSchema()
     {
         using var conn = GetConnection();
@@ -43,6 +58,13 @@ public class DatabaseService
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// 현재 연결된 데이터베이스 파일의 절대 경로를 반환합니다.
+    /// 백업 서비스 등에서 원본 파일 위치를 찾을 때 사용됩니다.
+    /// </summary>
+    public string GetDbPath() => _dbPath;
+
+    // 테이블 생성 SQL (기존과 동일하므로 생략 없이 유지)
     private static string GetInitSql() => """
         -- 제품 테이블
         CREATE TABLE IF NOT EXISTS products (
@@ -56,7 +78,7 @@ public class DatabaseService
             updated_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         );
 
-        -- 재고 이력 테이블 (모든 재고 변동의 원천)
+        -- 재고 이력 테이블
         CREATE TABLE IF NOT EXISTS stock_history (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             barcode         TEXT NOT NULL REFERENCES products(barcode),
@@ -109,7 +131,7 @@ public class DatabaseService
             value TEXT NOT NULL
         );
 
-        -- 기본 설정값 삽입 (없을 때만)
+        -- 기본 설정값 삽입
         INSERT OR IGNORE INTO app_config (key, value) VALUES
             ('low_stock_warning', '5'),
             ('barcode_port', 'AUTO'),
@@ -124,7 +146,4 @@ public class DatabaseService
         CREATE INDEX IF NOT EXISTS idx_sale_master_created ON sale_masters(created_at);
         CREATE INDEX IF NOT EXISTS idx_held_cart_items_cart ON held_cart_items(cart_id);
         """;
-
-    public string GetDbPath() =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "inventory.db");
 }

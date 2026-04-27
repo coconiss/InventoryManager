@@ -28,23 +28,31 @@ public class SaleRepository : ISaleRepository
 
     public async Task<long> ProcessSaleAsync(List<SaleDetail> cart)
     {
+        // 튜닝: 무결성 검증 - 수량이 0 이하거나 데이터가 없는 경우 원천 차단
+        if (cart == null || !cart.Any())
+            throw new InvalidOperationException("결제할 항목이 없습니다.");
+
+        if (cart.Any(c => c.Quantity <= 0))
+            throw new InvalidOperationException("판매 수량은 1개 이상이어야 합니다.");
+
         await using var conn = _db.GetConnection();
         await using var tx = conn.BeginTransaction();
         try
         {
+            // 1) 재고 검증: 판매하려는 수량이 DB 상의 현재 재고보다 많은지 확인
             foreach (var item in cart)
             {
                 await using var stockCmd = conn.CreateCommand();
                 stockCmd.Transaction = tx;
-                stockCmd.CommandText =
-                    "SELECT COALESCE(SUM(quantity),0) FROM stock_history WHERE barcode = @b";
+                stockCmd.CommandText = "SELECT COALESCE(SUM(quantity),0) FROM stock_history WHERE barcode = @b";
                 stockCmd.Parameters.AddWithValue("@b", item.Barcode);
+
                 int currentQty = Convert.ToInt32(await stockCmd.ExecuteScalarAsync());
                 if (currentQty < item.Quantity)
-                    throw new InvalidOperationException(
-                        $"재고 부족: [{item.ProductName}] 현재 재고 {currentQty}개, 판매 요청 {item.Quantity}개");
+                    throw new InvalidOperationException($"재고 부족: [{item.ProductName}] 현재 재고 {currentQty}개, 판매 요청 {item.Quantity}개");
             }
 
+            // 2) 판매 마스터 레코드 생성
             decimal totalAmount = cart.Sum(d => d.LineTotal);
             await using var masterCmd = conn.CreateCommand();
             masterCmd.Transaction = tx;
@@ -56,6 +64,8 @@ public class SaleRepository : ISaleRepository
             long saleId = Convert.ToInt64(await masterCmd.ExecuteScalarAsync());
 
             var txWrapper = new SqliteTransactionWrapper { Connection = conn, Transaction = tx };
+
+            // 3) 판매 상세 레코드 삽입 및 재고(OUT) 기록
             foreach (var item in cart)
             {
                 await using var detailCmd = conn.CreateCommand();
@@ -71,13 +81,18 @@ public class SaleRepository : ISaleRepository
                 detailCmd.Parameters.AddWithValue("@price", item.Price);
                 await detailCmd.ExecuteNonQueryAsync();
 
+                // IStockRepository의 트랜잭션 래퍼를 통해 재고 차감 기록 연동
                 await _stockRepo.RecordOutboundAsync(item.Barcode, item.Quantity, saleId, txWrapper);
             }
 
             tx.Commit();
             return saleId;
         }
-        catch { tx.Rollback(); throw; }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
     }
 
     /// <summary>

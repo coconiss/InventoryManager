@@ -251,9 +251,17 @@ public class RevenueViewModel : ViewModelBase
 
         LoadCommand = new AsyncRelayCommand(async () =>
         {
-            if (SelectedTabIndex == 0) await LoadDailyAsync();
-            else if (SelectedTabIndex == 1) await LoadMonthlyAsync();
-            else await LoadProductSalesAsync();
+            IsBusy = true; // 조회 시작 시 로딩 인디케이터 켬
+            try
+            {
+                await LoadDailyAsync();
+                await LoadMonthlyAsync();
+                await LoadProductSalesAsync();
+            }
+            finally
+            {
+                IsBusy = false; // 조회 완료 후 로딩 인디케이터 끔
+            }
         });
     }
 
@@ -286,92 +294,81 @@ public class RevenueViewModel : ViewModelBase
 
     private async Task LoadDailyAsync()
     {
-        IsBusy = true;
-        try
+        // try/finally(IsBusy) 제거 및 중복 호출 제거
+        var items = await _saleRepo.GetDailySalesAsync(FromDate, ToDate);
+        DailySales.Clear();
+        foreach (var s in items) DailySales.Add(s);
+        TotalRevenue = DailySales.Sum(s => s.TotalAmount);
+
+        var values = DailySales.Select(s => (double)s.TotalAmount).ToArray();
+        var labels = DailySales.Select(s => s.CreatedAt.ToString("MM/dd")).ToArray();
+
+        DailySeries =
+        [
+            new ColumnSeries<double>
         {
-            var items = await _saleRepo.GetDailySalesAsync(FromDate, ToDate);
-            DailySales.Clear();
-            foreach (var s in items) DailySales.Add(s);
-            TotalRevenue = DailySales.Sum(s => s.TotalAmount);
-
-            var values = DailySales.Select(s => (double)s.TotalAmount).ToArray();
-            var labels = DailySales.Select(s => s.CreatedAt.ToString("MM/dd")).ToArray();
-
-            DailySeries =
-            [
-                new ColumnSeries<double>
-                {
-                    Values = values,
-                    Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
-                    Name = "일별 매출",
-                    // 툴팁에 한글 폰트 적용
-                    TooltipLabelFormatter = p =>
-                    {
-                        int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
-                        string label = idx < labels.Length ? labels[idx] : "";
-                        return $"{label} : {p.PrimaryValue:N0}원";
-                    },
-                    DataLabelsPaint = LabelPaint()
-                }
-            ];
-            DailyXAxes =
-            [
-                new Axis
-                {
-                    Labels = labels,
-                    LabelsRotation = -45,
-                    LabelsPaint = LabelPaint(),
-                    TextSize = 11
-                }
-            ];
-            DailyYAxes = MakeYAxis();
-
-            await LoadProductSalesAsync();
+            Values = values,
+            Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
+            Name = "일별 매출",
+            TooltipLabelFormatter = p =>
+            {
+                int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
+                string label = idx < labels.Length ? labels[idx] : "";
+                return $"{label} : {p.PrimaryValue:N0}원";
+            },
+            DataLabelsPaint = LabelPaint()
         }
-        finally { IsBusy = false; }
+        ];
+        DailyXAxes =
+        [
+            new Axis
+        {
+            Labels = labels,
+            LabelsRotation = -45,
+            LabelsPaint = LabelPaint(),
+            TextSize = 11
+        }
+        ];
+        DailyYAxes = MakeYAxis();
     }
 
     private async Task LoadMonthlyAsync()
     {
-        IsBusy = true;
-        try
+        // try/finally(IsBusy) 제거
+        int year = FromDate.Year;
+        var items = await _saleRepo.GetMonthlySalesAsync(year);
+        MonthlySales.Clear();
+        foreach (var s in items) MonthlySales.Add(s);
+
+        var values = MonthlySales.Select(s => (double)s.Total).ToArray();
+        var labels = MonthlySales.Select(s => s.YM).ToArray();
+
+        MonthlySeries =
+        [
+            new ColumnSeries<double>
         {
-            int year = FromDate.Year;
-            var items = await _saleRepo.GetMonthlySalesAsync(year);
-            MonthlySales.Clear();
-            foreach (var s in items) MonthlySales.Add(s);
-
-            var values = MonthlySales.Select(s => (double)s.Total).ToArray();
-            var labels = MonthlySales.Select(s => s.YM).ToArray();
-
-            MonthlySeries =
-            [
-                new ColumnSeries<double>
-                {
-                    Values = values,
-                    Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
-                    Name = "월별 매출",
-                    TooltipLabelFormatter = p =>
-                    {
-                        int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
-                        string label = idx < labels.Length ? labels[idx] : "";
-                        return $"{label} : {p.PrimaryValue:N0}원";
-                    },
-                    DataLabelsPaint = LabelPaint()
-                }
-            ];
-            MonthlyXAxes =
-            [
-                new Axis
-                {
-                    Labels = labels,
-                    LabelsPaint = LabelPaint(),
-                    TextSize = 11
-                }
-            ];
-            MonthlyYAxes = MakeYAxis();
+            Values = values,
+            Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
+            Name = "월별 매출",
+            TooltipLabelFormatter = p =>
+            {
+                int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
+                string label = idx < labels.Length ? labels[idx] : "";
+                return $"{label} : {p.PrimaryValue:N0}원";
+            },
+            DataLabelsPaint = LabelPaint()
         }
-        finally { IsBusy = false; }
+        ];
+        MonthlyXAxes =
+        [
+            new Axis
+        {
+            Labels = labels,
+            LabelsPaint = LabelPaint(),
+            TextSize = 11
+        }
+        ];
+        MonthlyYAxes = MakeYAxis();
     }
 
     private async Task LoadProductSalesAsync()
