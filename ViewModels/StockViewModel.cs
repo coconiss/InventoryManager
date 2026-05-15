@@ -310,11 +310,11 @@ public class RevenueViewModel : ViewModelBase
             Values = values,
             Fill = new SolidColorPaint(new SKColor(52, 152, 219)),
             Name = "일별 매출",
-            TooltipLabelFormatter = p =>
+            YToolTipLabelFormatter = p =>
             {
                 int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
                 string label = idx < labels.Length ? labels[idx] : "";
-                return $"{label} : {p.PrimaryValue:N0}원";
+                return $"{label} : {p.Coordinate.PrimaryValue:N0}원";
             },
             DataLabelsPaint = LabelPaint()
         }
@@ -350,11 +350,11 @@ public class RevenueViewModel : ViewModelBase
             Values = values,
             Fill = new SolidColorPaint(new SKColor(39, 174, 96)),
             Name = "월별 매출",
-            TooltipLabelFormatter = p =>
+            YToolTipLabelFormatter = p =>
             {
                 int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
                 string label = idx < labels.Length ? labels[idx] : "";
-                return $"{label} : {p.PrimaryValue:N0}원";
+                return $"{label} : {p.Coordinate.PrimaryValue:N0}원";
             },
             DataLabelsPaint = LabelPaint()
         }
@@ -396,11 +396,11 @@ public class RevenueViewModel : ViewModelBase
                 Values = top.Select(p => (double)p.Total).ToArray(),
                 Fill = new SolidColorPaint(new SKColor(231, 76, 60)),
                 Name = "제품별 매출",
-                TooltipLabelFormatter = p =>
+                YToolTipLabelFormatter = p =>
                 {
                     int idx = (int)p.Context.Entity.MetaData!.EntityIndex;
                     string label = idx < productLabels.Length ? productLabels[idx] : "";
-                    return $"{label} : {p.PrimaryValue:N0}원";
+                    return $"{label} : {p.Coordinate.PrimaryValue:N0}원";
                 },
                 DataLabelsPaint = LabelPaint()
             }
